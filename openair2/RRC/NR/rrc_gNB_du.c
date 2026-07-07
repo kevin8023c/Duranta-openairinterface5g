@@ -452,11 +452,34 @@ int get_ssb_arfcn(const struct nr_rrc_cell_container_t *cell)
   return 0;
 }
 
+/* Return true if a PLMN is present in the CU/gNB configured PLMN list. */
+static bool plmn_in_cu_list(const nr_rrc_config_t *conf, const plmn_id_t *p)
+{
+  for (int c = 0; c < conf->num_plmn; c++) {
+    if (conf->plmn[c].mcc == p->mcc && conf->plmn[c].mnc == p->mnc
+        && conf->plmn[c].mnc_digit_length == p->mnc_digit_length)
+      return true;
+  }
+  return false;
+}
+
+/* MOCN: a CU may serve multiple PLMNs and a DU/cell may advertise one or more
+ * served PLMNs. Accept the cell only if every DU-advertised PLMN is part of the
+ * CU/gNB configured PLMN list (the DU PLMN set must be a subset of the CU PLMN
+ * set): a UE may select any broadcast PLMN, so an unsupported one would leave
+ * the CU unable to route the UE to an AMF and must be rejected as a
+ * misconfiguration. Falls back to the legacy single PLMN (info->plmn) when the
+ * DU did not populate served_plmn_list[] (num_plmn == 0). */
 static bool rrc_gNB_plmn_matches(const gNB_RRC_INST *rrc, const f1ap_served_cell_info_t *info)
 {
   const nr_rrc_config_t *conf = &rrc->configuration;
-  return conf->num_plmn == 1 // F1 supports only one
-         && conf->plmn[0].mcc == info->plmn.mcc && conf->plmn[0].mnc == info->plmn.mnc;
+  if (info->num_plmn == 0)
+    return plmn_in_cu_list(conf, &info->plmn); /* legacy single-PLMN DU */
+  for (int d = 0; d < info->num_plmn; d++) {
+    if (!plmn_in_cu_list(conf, &info->served_plmn_list[d].plmn))
+      return false;
+  }
+  return true;
 }
 
 static bool extract_sys_info(const f1ap_gnb_du_system_info_t *sys_info, NR_MIB_t **mib, NR_SIB1_t **sib1)
