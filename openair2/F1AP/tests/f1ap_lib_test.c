@@ -206,9 +206,13 @@ static void test_f1ap_setup_request(void)
       .plmn.mcc = 1,
       .plmn.mnc = 1,
       .plmn.mnc_digit_length = 3,
-      .num_ssi = 1,
-      .nssai[0].sst = 1,
-      .nssai[0].sd = 1,
+      .num_plmn = 1,
+      .served_plmn_list[0].plmn.mcc = 1,
+      .served_plmn_list[0].plmn.mnc = 1,
+      .served_plmn_list[0].plmn.mnc_digit_length = 3,
+      .served_plmn_list[0].num_nssai = 1,
+      .served_plmn_list[0].nssai[0].sst = 1,
+      .served_plmn_list[0].nssai[0].sd = 1,
       .tac = tac,
   };
   // create message
