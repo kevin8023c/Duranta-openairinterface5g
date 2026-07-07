@@ -475,6 +475,77 @@ static void get_sib19_schedinfo(NR_UE_RRC_SI_INFO *SI_info, NR_SI_SchedulingInfo
 
 static void nr_rrc_process_sib1(NR_UE_RRC_INST_t *rrc, NR_UE_RRC_SI_INFO *SI_info, NR_SIB1_t *sib1)
 {
+
+  /* PLMN selection: match UE's IMSI with SIB1 PLMNs (MOCN support).
+   * gNB places all broadcast PLMNs inside a single outer PLMN-IdentityInfo
+   * block's plmn_IdentityList (see nr_radio_config.c get_SIB1_NR), so we use
+   * the inner index (j+1) as 1-based selectedPLMN_Identity per TS 38.331. */
+  {
+    nr_ue_nas_t *nas = get_ue_nas_info(rrc->ue_id);
+    bool plmn_matched = false;
+    if (nas && nas->uicc && nas->uicc->imsiStr
+        && sib1->cellAccessRelatedInfo.plmn_IdentityInfoList.list.array) {
+      const char *imsi = nas->uicc->imsiStr;
+      int mnc_len = nas->uicc->nmc_size; /* 2 or 3 */
+      /* Defensive: IMSI must be long enough to hold MCC(3) + MNC(mnc_len) */
+      if (strlen(imsi) >= (size_t)(3 + mnc_len) && (mnc_len == 2 || mnc_len == 3)) {
+        uint8_t ue_mcc[3] = {imsi[0] - '0', imsi[1] - '0', imsi[2] - '0'};
+        uint8_t ue_mnc[3] = {0};
+        if (mnc_len == 2) {
+          /* For 2-digit MNC, SIB1 only encodes 2 digits; align to mnc[1..2] */
+          ue_mnc[0] = 0xF; /* unused, placeholder */
+          ue_mnc[1] = imsi[3] - '0';
+          ue_mnc[2] = imsi[4] - '0';
+        } else { /* mnc_len == 3 */
+          ue_mnc[0] = imsi[3] - '0';
+          ue_mnc[1] = imsi[4] - '0';
+          ue_mnc[2] = imsi[5] - '0';
+        }
+
+        NR_PLMN_IdentityInfoList_t *info_list = &sib1->cellAccessRelatedInfo.plmn_IdentityInfoList;
+        for (int i = 0; i < info_list->list.count && !plmn_matched; i++) {
+          NR_PLMN_IdentityInfo_t *plmn_info = info_list->list.array[i];
+          for (int j = 0; j < plmn_info->plmn_IdentityList.list.count && !plmn_matched; j++) {
+            NR_PLMN_Identity_t *plmn_id = plmn_info->plmn_IdentityList.list.array[j];
+
+            /* MCC compare (mcc is OPTIONAL; if absent, cannot match) */
+            bool mcc_match = false;
+            if (plmn_id->mcc && plmn_id->mcc->list.count == 3) {
+              mcc_match = (*plmn_id->mcc->list.array[0] == ue_mcc[0])
+                       && (*plmn_id->mcc->list.array[1] == ue_mcc[1])
+                       && (*plmn_id->mcc->list.array[2] == ue_mcc[2]);
+            }
+
+            /* MNC compare: digit count must match UE's MNC length */
+            bool mnc_match = false;
+            if (mcc_match) {
+              if (plmn_id->mnc.list.count == 2 && mnc_len == 2) {
+                mnc_match = (*plmn_id->mnc.list.array[0] == ue_mnc[1])
+                         && (*plmn_id->mnc.list.array[1] == ue_mnc[2]);
+              } else if (plmn_id->mnc.list.count == 3 && mnc_len == 3) {
+                mnc_match = (*plmn_id->mnc.list.array[0] == ue_mnc[0])
+                         && (*plmn_id->mnc.list.array[1] == ue_mnc[1])
+                         && (*plmn_id->mnc.list.array[2] == ue_mnc[2]);
+              }
+            }
+
+            if (mcc_match && mnc_match) {
+              /* selectedPLMN_Identity is 1-based; use inner index */
+              rrc->selected_plmn_identity = j + 1;
+              plmn_matched = true;
+              LOG_I(NR_RRC, "PLMN matched: IMSI=%s -> selected_plmn_identity=%ld (block[%d] plmn[%d])\n",
+                    imsi, rrc->selected_plmn_identity, i, j);
+            }
+          }
+        }
+      }
+    }
+    if (!plmn_matched) {
+      rrc->selected_plmn_identity = 1; /* fallback to first PLMN */
+      LOG_W(NR_RRC, "No PLMN matched UE IMSI; falling back to selected_plmn_identity=1\n");
+    }
+  }
+
   if(g_log->log_component[NR_RRC].level >= OAILOG_DEBUG)
     xer_fprint(stdout, &asn_DEF_NR_SIB1, (const void *) sib1);
   LOG_A(NR_RRC, "SIB1 decoded\n");
