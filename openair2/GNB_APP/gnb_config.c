@@ -1010,7 +1010,7 @@ static int read_du_cell_info(bool separate_du,
   }
 
   info->plmn = p[0]; // primary PLMN of the NR CGI
-  info->nr_cellid = (uint64_t) * (GNBParamList.paramarray[0][GNB_NRCELLID_IDX].u64ptr);
+  info->nr_cellid = *GNBParamList.paramarray[0][GNB_NRCELLID_IDX].u64ptr;
 
   return 1;
 }

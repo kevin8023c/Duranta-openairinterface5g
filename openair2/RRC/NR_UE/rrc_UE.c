@@ -478,7 +478,9 @@ static void get_sib19_schedinfo(NR_UE_RRC_SI_INFO *SI_info, NR_SI_SchedulingInfo
  * non-matchable placeholder by the caller to keep 1-based indices aligned. */
 static bool plmn_from_asn1(const NR_PLMN_Identity_t *src, plmn_id_t *dst)
 {
-  if (!src || !dst || !src->mcc || src->mcc->list.count != 3)
+  DevAssert(src);
+  DevAssert(dst);
+  if (!src->mcc || src->mcc->list.count != 3)
     return false;
   if (src->mnc.list.count != 2 && src->mnc.list.count != 3)
     return false;
