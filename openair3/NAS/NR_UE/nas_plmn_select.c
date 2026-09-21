@@ -8,6 +8,8 @@
 #include <string.h>
 #include "nr_nas_msg.h"
 
+/* @brief Return true and write the 1-based selectedPLMN-Identity (TS 38.331) of the
+ * plmns[] entry matching the UE IMSI (MCC/MNC from UICC); false (output untouched) if none. */
 bool nas_get_selected_plmn(const nr_ue_nas_t *nas, const plmn_id_t *plmns, int num_plmns, long *selected_plmn_identity)
 {
   if (!nas || !nas->uicc || !nas->uicc->imsiStr || !plmns || !selected_plmn_identity)

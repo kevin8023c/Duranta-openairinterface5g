@@ -463,7 +463,7 @@ static bool rrc_gNB_plmn_matches(const nr_rrc_config_t *conf, const plmn_id_t *p
   return false;
 }
 
-/* MOCN: accept the cell if at least one DU-advertised PLMN is served by the CU. */
+/* Accept the cell if at least one DU-advertised PLMN is served by the CU. */
 static bool rrc_gNB_served_plmns_match(const nr_rrc_config_t *conf, const f1ap_served_cell_info_t *info)
 {
   for (int d = 0; d < info->num_plmn; d++) {
